@@ -3,6 +3,7 @@ import path from 'path';
 
 // 1. DAFTAR PENGECUALIAN (Folder/file yang tidak akan ditampilkan)
 const IGNORE_LIST = [
+    '.next',
     'node_modules', 
     '.git', 
     '.vscode', 

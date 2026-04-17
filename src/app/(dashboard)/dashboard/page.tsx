@@ -111,10 +111,10 @@ export default function DashboardPage() {
   }, [searchQuery, logs]);
 
   // ==========================================
-  // HELPER FUNCTIONS (Formatting & Fix AM/PM)
+  // HELPER FUNCTIONS (Formatting & Fix Waktu)
   // ==========================================
   
-  // Format Tanggal (Contoh: 26 Jun 2025)
+  // Format Tanggal
   const formatTgl = (tgl: string | Date) => {
     if (!tgl) return "-";
     const date = new Date(tgl);
@@ -122,14 +122,16 @@ export default function DashboardPage() {
     return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  // REVISI 2: Perbaiki format waktu AM/PM atau Serial ke 24 Jam Jakarta
+  // REVISI: Perbaikan Cerdas Format Waktu
   const parseTimeValue = (timeVal: any): string => {
     if (!timeVal) return "-";
 
+    // 1. Jika bertipe Date murni
     if (typeof timeVal === 'object' && timeVal instanceof Date) {
       return timeVal.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
     }
 
+    // 2. Jika desimal Excel (contoh: 0.5 = 12:00)
     if (typeof timeVal === 'number') {
       const totalMinutes = Math.round(timeVal * 24 * 60);
       const hours = Math.floor(totalMinutes / 60) % 24;
@@ -138,35 +140,66 @@ export default function DashboardPage() {
     }
 
     const str = String(timeVal).trim();
+
+    // 3. Jika format ISO string dari Google Sheets (contoh: "1899-12-30T04:25:48")
+    // Fungsi ini akan otomatis mengonversi jam UTC ke jam WIB (lokal browser)
+    if (str.includes("T") && str.includes("-")) {
+      const date = new Date(str);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+      }
+    }
+
+    // 4. Jika teks AM/PM
     if (str.includes("AM") || str.includes("PM")) {
-      const parts = str.match(/(\d+):(\d+):(\d+)\s*([AP]M)/i);
+      const parts = str.match(/(\d+):(\d+):(\d+)\s*([AP]M)/i) || str.match(/(\d+):(\d+)\s*([AP]M)/i);
       if (parts) {
-        let [_, hStr, mStr, sStr, apStr] = parts;
-        let h = parseInt(hStr, 10);
+        let h = parseInt(parts[1], 10);
+        let mStr = parts[2];
+        let apStr = parts[parts.length - 1]; // Ambil grup penutup AM/PM
         if (apStr.toUpperCase() === "PM" && h < 12) h += 12;
         if (apStr.toUpperCase() === "AM" && h === 12) h = 0;
         return `${h.toString().padStart(2, '0')}:${mStr.padStart(2, '0')}`;
       }
     }
     
+    // 5. Jika string sudah berformat "HH:mm"
     if (str.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) return str.substring(0,5);
     return str; 
   };
 
-  // REVISI 2: Perbaiki format Durasi Desimal ke Jam.Menit (0.00)
+  // REVISI FINAL: Fix Durasi 24.00
   const parseDurationValue = (durVal: any): string => {
-    if (!durVal) return "0.00";
-    const str = String(durVal).trim();
-
-    if (str.includes("Jam") || str.includes("Menit")) return str; 
+    if (!durVal && durVal !== 0) return "0.00";
     
+    // 1. Jika durasi sudah dalam bentuk text jam/menit
+    const str = String(durVal).trim();
+    if (str.includes("Jam") || str.includes("Menit") || str.includes("jam")) return str; 
+
+    // 2. Jika ISO String (jarang terjadi pada durasi, tapi untuk jaga-jaga)
+    if (str.includes("T") && str.includes("-")) {
+       const d = new Date(str);
+       if (!isNaN(d.getTime())) {
+          return `${d.getUTCHours()}.${d.getUTCMinutes().toString().padStart(2, '0')}`;
+       }
+    }
+
+    // 3. Konversi angka
     const num = parseFloat(str);
     if (!isNaN(num)) {
-       const totalMinutes = Math.round(num * 24 * 60); 
-       const h = Math.floor(totalMinutes / 60);
-       const m = totalMinutes % 60;
-       return `${h}.${m.toString().padStart(2, '0')}`;
+       // Kunci Perbaikannya: 
+       // Kita cek apakah input dari Google Sheets ini adalah "Desimal Hari" (sangat kecil, spt 0.0416 untuk 1 jam)
+       // ATAU angka utuh yang memang dimasukkan oleh user dari form kita (seperti "1.00", "0.30", "1.50")
+       
+       // Logika sederhana: Jika angka lebih kecil dari 0.1 AND kita tahu ini dikirim oleh sistem lain sbg desimal hari,
+       // kita ubah. TAPI karena kita mengirim format "0.00" langsung dari form, kemungkinan besar
+       // Google Sheets MENYIMPANNYA sebagai format text/angka mentah.
+       
+       // Mari paksa semua input angka (baik 1, 1.00, atau 0.03) untuk langsung ditampilkan 
+       // dengan format desimal yang konsisten.
+       return num.toFixed(2);
     }
+
     return str; 
   };
 
@@ -378,11 +411,11 @@ export default function DashboardPage() {
 
                 <div className="grid grid-cols-3 gap-3 lg:gap-4 p-4 bg-gray-900 rounded-2xl items-center text-center">
                   <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">START (JKT)</p>
+                      <p className="text-[10px] font-bold text-gray-500 uppercase">START (WIB)</p>
                       <p className="text-lg lg:text-xl font-black text-white">{parseTimeValue(selectedLog.start)}</p>
                   </div>
                   <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">END (JKT)</p>
+                      <p className="text-[10px] font-bold text-gray-500 uppercase">END (WIB)</p>
                       <p className="text-lg lg:text-xl font-black text-white">{parseTimeValue(selectedLog.end)}</p>
                   </div>
                   <div className="space-y-1 bg-[#FFD32A] p-2 lg:p-3 rounded-xl shadow-lg">

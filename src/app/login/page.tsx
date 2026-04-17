@@ -63,7 +63,7 @@ export default function LoginPage() {
             />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-700 to-gray-500 pb-1">
-            Log Aktivitas Mechanical
+            Log Aktivitas
           </h1>
           <p className="text-sm text-gray-500 mt-1 font-medium">
             Masuk dengan Nama/NIK dan Password

@@ -17,14 +17,10 @@ export default function PengaturanPage() {
 
   const [userData, setUserData] = useState<UserData | null>(null);
   
-  // State Form & Loading
+  // State Loading & Upload
   const [isSaving, setIsSaving] = useState(false);
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [validationData, setValidationData] = useState({ group: [], departement: [], plant: [] });
-  const [formProfil, setFormProfil] = useState({ group: "", departement: "", plant: "" });
 
   // State Ganti Password
   const [passwords, setPasswords] = useState({ old: "", new: "", confirm: "" });
@@ -39,18 +35,7 @@ export default function PengaturanPage() {
     if (storedData) {
       const parsed = JSON.parse(storedData);
       setUserData(parsed);
-      setFormProfil({ group: parsed.group, departement: parsed.departement, plant: parsed.plant });
     }
-
-    fetch(SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "get_validation" })
-    })
-    .then(res => res.json())
-    .then(res => {
-      if(res.status === "success") setValidationData(res.data);
-    })
-    .catch(err => console.error("Gagal memuat dropdown:", err));
   }, []);
 
   // Fix Gambar Google Drive
@@ -136,27 +121,6 @@ export default function PengaturanPage() {
     };
   };
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userData) return;
-    setIsUpdatingProfile(true);
-
-    try {
-      const res = await fetch(SCRIPT_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "update_profile", nik: userData.nik, ...formProfil })
-      });
-      const result = await res.json();
-      if (result.status === "success") {
-        const newData = { ...userData, ...formProfil };
-        setUserData(newData);
-        localStorage.setItem("userData", JSON.stringify(newData));
-        triggerGlobalUpdate();
-        alert("Informasi Pekerjaan berhasil diperbarui!");
-      } else alert(result.message);
-    } catch (error) { alert("Kesalahan sistem."); } finally { setIsUpdatingProfile(false); }
-  };
-
   const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userData) return;
@@ -216,20 +180,35 @@ export default function PengaturanPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
-        {/* KOLOM KIRI */}
+        {/* KOLOM KIRI: Profil Ringkas */}
         <div className="lg:col-span-1 space-y-6 md:space-y-8">
           <div className="relative z-10 w-full p-6 md:p-8 bg-white/70 backdrop-blur-2xl border border-white/80 rounded-3xl md:rounded-[2rem] shadow-[0_15px_35px_-15px_rgba(0,0,0,0.05)] text-center">
             
-            <div className="relative mx-auto w-28 h-28 md:w-32 md:h-32 mb-6 group">
-              <div onClick={() => !isUploading && fileInputRef.current?.click()} className={`w-full h-full rounded-full flex items-center justify-center text-4xl md:text-5xl font-extrabold shadow-xl ring-4 md:ring-8 ring-white/50 cursor-pointer overflow-hidden relative bg-gradient-to-tr from-gray-900 via-gray-800 to-gray-600 text-[#FFD32A] ${isUploading ? 'opacity-50 animate-pulse' : 'hover:opacity-90 transition-opacity'}`}>
+            <div className="relative mx-auto w-28 h-28 md:w-32 md:h-32 mb-6 group cursor-pointer" onClick={() => !isUploading && fileInputRef.current?.click()}>
+              <div className={`w-full h-full rounded-full flex items-center justify-center text-4xl md:text-5xl font-extrabold shadow-xl ring-4 md:ring-8 ring-white/50 overflow-hidden relative bg-gradient-to-tr from-gray-900 via-gray-800 to-gray-600 text-[#FFD32A] ${isUploading ? 'opacity-50 animate-pulse' : 'group-hover:opacity-90 transition-opacity'}`}>
                 {userData.foto ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={getSafeImageUrl(userData.foto)} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : ( userData.nama.charAt(0).toUpperCase() )}
+                
+                {/* Overlay Gelap saat di-hover (Opsional, tapi bagus untuk penanda) */}
                 {!isUploading && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"><svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg></div>
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <span className="text-white text-xs font-bold uppercase tracking-wider">Ubah</span>
+                  </div>
                 )}
               </div>
+
+              {/* LENCANA (BADGE) KAMERA PERSISTEN */}
+              {!isUploading && (
+                <div className="absolute bottom-0 right-0 md:bottom-1 md:right-1 bg-[#FFD32A] text-gray-900 rounded-full p-2 md:p-2.5 shadow-lg ring-4 ring-white group-hover:scale-110 transition-transform duration-300">
+                  <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <circle cx="12" cy="13" r="3" stroke="currentColor" strokeWidth={2.5} />
+                  </svg>
+                </div>
+              )}
+
               <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
             </div>
 
@@ -257,26 +236,13 @@ export default function PengaturanPage() {
           </div>
         </div>
 
-        {/* KOLOM KANAN */}
+        {/* KOLOM KANAN: Keamanan Akun */}
         <div className="lg:col-span-2 space-y-6 md:space-y-8">
           
-          {/* Card Form Profil Pekerjaan */}
-          <div className="relative z-10 w-full p-6 md:p-8 bg-white/70 backdrop-blur-2xl border border-white/80 rounded-3xl md:rounded-[2rem] shadow-[0_15px_35px_-15px_rgba(0,0,0,0.05)]">
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-4 md:mb-6">Informasi Pekerjaan</h3>
-            <form onSubmit={handleUpdateProfile} className="space-y-4 md:space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
-                <div className="space-y-1.5 group"><label className="block text-sm font-bold text-gray-700">Departement</label><select value={formProfil.departement} onChange={e => setFormProfil({...formProfil, departement: e.target.value})} className="w-full px-4 py-3 md:px-5 md:py-3.5 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 focus:border-[#FFD32A] font-medium text-sm md:text-base appearance-none" required><option value="" disabled>Pilih Departement</option>{validationData.departement.map((val: string) => <option key={val} value={val}>{val}</option>)}</select></div>
-                <div className="space-y-1.5 group"><label className="block text-sm font-bold text-gray-700">Plant</label><select value={formProfil.plant} onChange={e => setFormProfil({...formProfil, plant: e.target.value})} className="w-full px-4 py-3 md:px-5 md:py-3.5 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 focus:border-[#FFD32A] font-medium text-sm md:text-base appearance-none" required><option value="" disabled>Pilih Plant</option>{validationData.plant.map((val: string) => <option key={val} value={val}>{val}</option>)}</select></div>
-                <div className="space-y-1.5 group sm:col-span-2"><label className="block text-sm font-bold text-gray-700">Group</label><select value={formProfil.group} onChange={e => setFormProfil({...formProfil, group: e.target.value})} className="w-full px-4 py-3 md:px-5 md:py-3.5 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 focus:border-[#FFD32A] font-medium text-sm md:text-base appearance-none" required><option value="" disabled>Pilih Group</option>{validationData.group.map((val: string) => <option key={val} value={val}>{val}</option>)}</select></div>
-              </div>
-              <div className="pt-2 md:pt-4 flex justify-end"><button type="submit" disabled={isUpdatingProfile} className="w-full sm:w-auto px-6 md:px-8 py-3 md:py-3.5 font-extrabold rounded-xl text-black bg-gradient-to-r from-[#FFD32A] to-[#ffda47] hover:shadow-[0_10px_20px_-10px_rgba(255,211,42,1)] hover:-translate-y-0.5 active:scale-[0.98] transition-all disabled:opacity-70 text-sm md:text-base">{isUpdatingProfile ? "Menyimpan..." : "Simpan Perubahan"}</button></div>
-            </form>
-          </div>
-
-          {/* Card Keamanan Akun DENGAN SHOW/HIDE PASSWORD */}
           <div className="relative z-10 w-full p-6 md:p-8 bg-white/70 backdrop-blur-2xl border border-white/80 rounded-3xl md:rounded-[2rem] shadow-[0_15px_35px_-15px_rgba(0,0,0,0.05)]">
             <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-1 md:mb-2">Keamanan Akun</h3>
-            <p className="text-xs md:text-sm text-gray-500 mb-4 md:mb-6">Perbarui kata sandi Anda secara berkala.</p>
+            <p className="text-xs md:text-sm text-gray-500 mb-4 md:mb-6">Perbarui kata sandi Anda secara berkala untuk menjaga keamanan akun.</p>
+            
             <form onSubmit={handleSavePassword} className="space-y-4 md:space-y-5">
               
               <div className="space-y-1.5 group">
