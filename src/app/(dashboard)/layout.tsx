@@ -12,7 +12,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (pathname === "/dashboard") return "Dashboard Utama";
     if (pathname === "/log-aktivitas") return "Log Aktivitas Harian";
     if (pathname === "/pengaturan") return "Pengaturan Sistem";
-    return "Sistem Manajemen";
+    return "User Management";
   };
 
   return (
@@ -25,7 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex-1 flex flex-col lg:ml-72 min-h-screen w-full transition-all duration-300">
         
         {/* Header Responsive */}
-        <header className="h-20 lg:h-24 bg-white/80 backdrop-blur-md border-b border-gray-200/50 flex items-center justify-between px-4 lg:px-10 sticky top-0 z-30">
+        <header className="h-20 lg:h-24 bg-[#FFD32A] backdrop-blur-md border-b border-gray-200/50 flex items-center justify-between px-4 lg:px-10 sticky top-0 z-30">
           <div className="flex items-center gap-4">
             {/* Tombol Hamburger (Hanya muncul di HP/Tablet) */}
             <button 
@@ -41,8 +41,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <h2 className="text-xl lg:text-2xl font-extrabold text-gray-900 tracking-tight">
                 {getPageTitle()}
               </h2>
-              <p className="text-xs lg:text-sm font-medium text-gray-500 mt-0.5 hidden sm:block">
-                PT. Satoria Aneka Industri
+              <p className="text-xs lg:text-sm font-medium text-[#FAFAFA] mt-0.5 hidden sm:block">
+                Sistem Manajemen Pelaporan Aktivitas Harian Personil dan Mesin
               </p>
             </div>
           </div>

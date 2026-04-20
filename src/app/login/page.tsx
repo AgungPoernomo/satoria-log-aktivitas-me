@@ -29,7 +29,13 @@ export default function LoginPage() {
       const result = await response.json();
 
       if (result.status === "success") {
+        // Log ini akan membuktikan apakah Group "Admin" benar-benar terbaca!
+        console.log("DATA DITERIMA DARI SERVER:", result.data);
+        
         localStorage.setItem("userData", JSON.stringify(result.data));
+        // Memicu trigger storage manual agar Sidebar langsung sadar ada data baru
+        window.dispatchEvent(new Event("storage"));
+        
         router.push("/dashboard");
       } else {
         alert(result.message);

@@ -284,7 +284,7 @@ export default function LogAktivitasPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-sm font-bold text-gray-700">Penggantian Sparepart <span className="text-gray-400 font-normal">(Opsional)</span></label>
+                <label className="block text-sm font-bold text-gray-700">Sparepart </label>
                 <textarea name="sparepart" value={form.sparepart} onChange={handleFormChange} disabled={isLoading} rows={2} placeholder="Sebutkan sparepart yang digunakan/diganti (Jika ada)..." className="w-full px-5 py-3 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 text-gray-900 resize-none" />
               </div>
 

@@ -12,6 +12,12 @@ LOG-AKTIVITAS-ME/
 ├── src // Folder utama source code aplikasi
 │   ├── app
 │   │   ├── (dashboard)
+│   │   │   ├── admin-aktivitas
+│   │   │   │   └── page.tsx
+│   │   │   ├── admin-data-validasi
+│   │   │   │   └── page.tsx
+│   │   │   ├── admin-update-user
+│   │   │   │   └── page.tsx
 │   │   │   ├── dashboard
 │   │   │   │   └── page.tsx
 │   │   │   ├── log-aktivitas
@@ -41,4 +47,4 @@ LOG-AKTIVITAS-ME/
 
 ```
 
-*Terakhir diperbarui pada: 17/4/2026, 15.14.30 WIB*
+*Terakhir diperbarui pada: 19/4/2026, 21.19.28 WIB*
