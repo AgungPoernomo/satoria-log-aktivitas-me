@@ -64,7 +64,7 @@ export default function DataValidasiPage() {
             <span className="text-xl">💡</span>
             <div>
               <p className="text-sm font-bold text-yellow-800">Kolom Otomatis</p>
-              <p className="text-xs text-yellow-700 mt-1">Saat Anda menambahkan <strong>MESIN</strong> baru, sistem akan otomatis membuatkan <strong>AREA</strong> baru di Database. Begitu juga saat dihapus.</p>
+              <p className="text-xs text-yellow-700 mt-1">Saat Anda menambahkan <strong>MESIN</strong> baru, sistem akan otomatis membuatkan <strong>SUB MESIN</strong> baru di Database. Begitu juga saat dihapus.</p>
             </div>
           </div>
         )}

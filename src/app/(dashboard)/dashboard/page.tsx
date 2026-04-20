@@ -409,9 +409,12 @@ export default function DashboardPage() {
       <div className="p-6 lg:p-8 bg-white/70 backdrop-blur-2xl border border-white/80 rounded-[2rem] shadow-sm overflow-hidden relative z-10">
         <h2 className="text-xl font-bold text-gray-900 mb-1">Tabel Aktivitas</h2>
         <p className="text-xs text-gray-500 mb-6">Menampilkan hasil berdasarkan filter yang aktif.</p>
-        <div className="overflow-x-auto custom-scrollbar pb-4">
+        
+        {/* REVISI 1: Tambahkan relative dan max-h untuk membatasi tinggi tabel agar bisa di-scroll dan sticky berjalan */}
+        <div className="overflow-x-auto overflow-y-auto max-h-[500px] custom-scrollbar pb-4 relative">
           <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="text-xs text-gray-400 uppercase bg-gray-50/50">
+            {/* REVISI 1: Tambahkan sticky top-0 dan z-index agar header menempel */}
+            <thead className="text-xs text-gray-400 uppercase bg-gray-100 sticky top-0 z-20 shadow-sm">
               <tr>
                 <th className="px-4 py-3 font-bold rounded-tl-lg">Waktu Kirim</th>
                 <th className="px-4 py-3 font-bold">Karyawan</th>
