@@ -306,7 +306,7 @@ export default function LogAktivitasPage() {
                   <div className="col-span-1 sm:col-span-3 space-y-1.5 relative">
                     <label className="flex justify-between items-center text-sm font-bold text-blue-900">
                       <span>Pilih Sparepart Gudang (Opsional)</span>
-                      <span className="text-[10px] bg-blue-100 px-2 py-0.5 rounded text-blue-700">Live Database</span>
+                      <span className="text-[10px] bg-blue-100 px-2 py-0.5 rounded text-blue-700">24/7 Live Database</span>
                     </label>
                     <select name="sparepart" value={form.sparepart} onChange={handleFormChange} disabled={isLoading} className="w-full px-4 py-3.5 bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-gray-900 appearance-none">
                       <option value="">-- Tidak ada penggunaan sparepart --</option>
