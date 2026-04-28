@@ -167,7 +167,7 @@ export default function AdminUpdateUserPage() {
               
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nama Lengkap</label>
-                <input type="text" value={newUserForm.nama} onChange={e => setNewUserForm({...newUserForm, nama: e.target.value})} required className="w-full bg-gray-800 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-400 text-white" placeholder="Contoh: John Doe" />
+                <input type="text" value={newUserForm.nama} onChange={e => setNewUserForm({...newUserForm, nama: e.target.value})} required className="w-full bg-gray-800 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-400 text-white" placeholder="Contoh: Andre" />
               </div>
 
               <div>

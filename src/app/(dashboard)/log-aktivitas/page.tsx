@@ -21,10 +21,17 @@ interface DraftLog {
   mesin: string;
   area: string;
   sparepart: string;
+  qtySparepart: string; 
   aktivitas: string;
   start: string;
   end: string;
   durasi: string;
+}
+
+interface SparepartGudang {
+  kategori: string;
+  spesifikasi: string;
+  stok: number;
 }
 
 export default function LogAktivitasPage() {
@@ -32,7 +39,6 @@ export default function LogAktivitasPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [tanggalMasuk, setTanggalMasuk] = useState("");
   
-  // State Validation Data
   const [validation, setValidation] = useState({
     groups: [] as string[],
     plants: [] as string[],
@@ -41,13 +47,13 @@ export default function LogAktivitasPage() {
     areasMap: {} as Record<string, string[]> 
   });
 
-  // State Form (Group & Plant dihapus dari sini karena akan diambil otomatis dari userData)
+  const [sparepartsGudang, setSparepartsGudang] = useState<SparepartGudang[]>([]);
+
   const [form, setForm] = useState({
     shift: "", tanggalTugas: "",
-    mesin: "", area: "", sparepart: "", aktivitas: "", start: "", end: ""
+    mesin: "", area: "", sparepart: "", qtySparepart: "", aktivitas: "", start: "", end: ""
   });
 
-  // MULTIPLE UPLOAD: State Keranjang / Draft
   const [draftLogs, setDraftLogs] = useState<DraftLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -66,15 +72,21 @@ export default function LogAktivitasPage() {
     setTanggalMasuk(today.toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit', year: 'numeric' }));
 
     fetch(SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: "get_log_validation" })
     })
     .then(res => res.json())
-    .then(res => {
-      if (res.status === "success") setValidation(res.data);
-    })
+    .then(res => { if (res.status === "success") setValidation(res.data); })
     .catch(err => console.error("Gagal memuat data dropdown:", err));
+
+    fetch(SCRIPT_URL, {
+      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "get_sparepart_gudang" })
+    })
+    .then(res => res.json())
+    .then(res => { if (res.status === "success") setSparepartsGudang(res.data); })
+    .catch(err => console.error("Gagal memuat data Gudang:", err));
+
   }, [router]);
 
   const calculateDurasi = () => {
@@ -102,22 +114,26 @@ export default function LogAktivitasPage() {
     });
   };
 
-  // MULTIPLE UPLOAD: Tambah ke Draft
   const handleAddToDraft = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userData) return;
     
+    if (form.sparepart && (!form.qtySparepart || parseInt(form.qtySparepart) <= 0)) {
+        alert("Harap masukkan Jumlah Qty sparepart yang valid!");
+        return;
+    }
+
     const durasi = calculateDurasi();
-    
     const newLog: DraftLog = {
       id: Date.now(),
       tanggalTugas: form.tanggalTugas,
       shift: form.shift,
-      plant: userData.plant, // Mengambil otomatis dari identitas user
-      group: userData.group, // Mengambil otomatis dari identitas user
+      plant: userData.plant, 
+      group: userData.group, 
       mesin: form.mesin,
       area: form.area,
       sparepart: form.sparepart,
+      qtySparepart: form.qtySparepart, 
       aktivitas: form.aktivitas,
       start: form.start,
       end: form.end,
@@ -125,20 +141,16 @@ export default function LogAktivitasPage() {
     };
 
     setDraftLogs([...draftLogs, newLog]);
-    
-    // Reset bagian detail pekerjaan, tapi pertahankan Tanggal Tugas & Shift
     setForm(prev => ({ 
       ...prev, 
-      mesin: "", area: "", sparepart: "", aktivitas: "", start: "", end: "" 
+      mesin: "", area: "", sparepart: "", qtySparepart: "", aktivitas: "", start: "", end: "" 
     }));
   };
 
-  // MULTIPLE UPLOAD: Hapus dari Draft
   const handleRemoveDraft = (id: number) => {
     setDraftLogs(draftLogs.filter(log => log.id !== id));
   };
 
-  // MULTIPLE UPLOAD: Kirim Semua Batch
   const handleSubmitBatch = async () => {
     if (!userData || draftLogs.length === 0) return;
     setIsLoading(true);
@@ -153,19 +165,14 @@ export default function LogAktivitasPage() {
 
     try {
       const response = await fetch(SCRIPT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        redirect: "follow", 
-        body: JSON.stringify({
-          action: "log_activity_batch",
-          logs: payloadLogs
-        }),
+        method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow", 
+        body: JSON.stringify({ action: "log_activity_batch", logs: payloadLogs }),
       });
 
       const result = await response.json();
       if (result.status === "success") {
-        alert(`Berhasil! ${draftLogs.length} Log aktivitas telah dikirim ke Server.`);
-        setDraftLogs([]); // Kosongkan keranjang
+        alert(result.message); 
+        setDraftLogs([]); 
       } else {
         alert("Gagal mencatat log: " + result.message);
       }
@@ -197,7 +204,6 @@ export default function LogAktivitasPage() {
         <div className="flex flex-col sm:flex-row items-center gap-5">
           <div className="w-20 h-20 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-gray-900 to-gray-700 flex items-center justify-center text-[#FFD32A] font-bold text-2xl shadow-inner overflow-hidden border-2 border-white flex-shrink-0">
             {userData.foto ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
               <img src={getSafeImageUrl(userData.foto)} alt="User" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
               userData.nama.charAt(0).toUpperCase()
@@ -217,19 +223,18 @@ export default function LogAktivitasPage() {
           <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Status Sistem</p>
           <div className="flex items-center gap-2 bg-green-50 px-4 py-2 sm:px-3 sm:py-1.5 rounded-xl border border-green-200">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            <p className="text-sm sm:text-xs font-bold text-green-700">Siap Input Batch</p>
+            <p className="text-sm sm:text-xs font-bold text-green-700">Terkoneksi Gudang</p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-8 relative z-10">
         
-        {/* BAGIAN KIRI: Form Input */}
         <div className="xl:col-span-3 w-full p-6 sm:p-10 bg-white/70 backdrop-blur-2xl border border-white/80 rounded-3xl sm:rounded-[2rem] shadow-[0_15px_35px_-15px_rgba(0,0,0,0.05)] h-fit">
           <div className="mb-8 border-b border-gray-200/60 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900">Form Log Aktivitas</h2>
-              <p className="text-sm text-gray-500 mt-1">Catat aktivitas harian Anda ke dalam Database.</p>
+              <p className="text-sm text-gray-500 mt-1">Catat aktivitas harian dan pemakaian sparepart Anda.</p>
             </div>
             <div className="bg-[#FFD32A]/20 text-yellow-800 px-4 py-2 rounded-xl text-xs font-bold border border-[#FFD32A]/30 w-fit">
               Tgl Masuk: {tanggalMasuk}
@@ -241,12 +246,10 @@ export default function LogAktivitasPage() {
             <div>
               <h3 className="text-sm font-extrabold text-gray-400 uppercase tracking-wider mb-4">Informasi Shift & Penugasan</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                
                 <div className="space-y-1.5">
                   <label className="block text-sm font-bold text-gray-700">Tanggal Tugas</label>
                   <input type="date" name="tanggalTugas" value={form.tanggalTugas} onChange={handleFormChange} disabled={isLoading} className="w-full px-4 py-3.5 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 text-gray-900" required />
                 </div>
-                
                 <div className="space-y-1.5">
                   <label className="block text-sm font-bold text-gray-700">Shift</label>
                   <select name="shift" value={form.shift} onChange={handleFormChange} disabled={isLoading} className="w-full px-4 py-3.5 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 text-gray-900 appearance-none" required>
@@ -254,17 +257,14 @@ export default function LogAktivitasPage() {
                     {validation.shifts.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-bold text-gray-500">Group (Otomatis)</label>
+                  <label className="block text-sm font-bold text-gray-500">Group</label>
                   <input type="text" value={userData.group} disabled className="w-full px-4 py-3.5 bg-gray-100 border border-gray-200/80 rounded-xl text-gray-500 font-medium cursor-not-allowed" />
                 </div>
-
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-bold text-gray-500">Plant (Otomatis)</label>
+                  <label className="block text-sm font-bold text-gray-500">Plant</label>
                   <input type="text" value={userData.plant} disabled className="w-full px-4 py-3.5 bg-gray-100 border border-gray-200/80 rounded-xl text-gray-500 font-medium cursor-not-allowed" />
                 </div>
-
               </div>
             </div>
 
@@ -293,17 +293,34 @@ export default function LogAktivitasPage() {
             <hr className="border-gray-200/60" />
 
             <div>
-              <h3 className="text-sm font-extrabold text-gray-400 uppercase tracking-wider mb-4">Detail Aktivitas & Waktu</h3>
+              <h3 className="text-sm font-extrabold text-gray-400 uppercase tracking-wider mb-4">Detail Aktivitas & Pemakaian Part</h3>
               <div className="space-y-5">
                 
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-bold text-gray-700">Aktivitas</label>
-                  <textarea name="aktivitas" value={form.aktivitas} onChange={handleFormChange} disabled={isLoading} rows={3} placeholder="Jelaskan aktivitas / pekerjaan yang dilakukan..." className="w-full px-5 py-4 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 text-gray-900 resize-none" required />
+                  <label className="block text-sm font-bold text-gray-700">Deskripsi Aktivitas</label>
+                  <textarea name="aktivitas" value={form.aktivitas} onChange={handleFormChange} disabled={isLoading} rows={2} placeholder="Jelaskan perbaikan / aktivitas yang dilakukan..." className="w-full px-5 py-4 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 text-gray-900 resize-none" required />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-bold text-gray-700">Sparepart </label>
-                  <textarea name="sparepart" value={form.sparepart} onChange={handleFormChange} disabled={isLoading} rows={2} placeholder="Sebutkan sparepart yang digunakan/diganti (Jika ada)..." className="w-full px-5 py-3 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 text-gray-900 resize-none" />
+                {/* MODIFIKASI: Input Sparepart menjadi Dropdown Live Data + Qty */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-5 bg-blue-50/50 rounded-2xl border border-blue-200/60 items-end">
+                  <div className="col-span-1 sm:col-span-3 space-y-1.5 relative">
+                    <label className="flex justify-between items-center text-sm font-bold text-blue-900">
+                      <span>Pilih Sparepart Gudang (Opsional)</span>
+                      <span className="text-[10px] bg-blue-100 px-2 py-0.5 rounded text-blue-700">Live Database</span>
+                    </label>
+                    <select name="sparepart" value={form.sparepart} onChange={handleFormChange} disabled={isLoading} className="w-full px-4 py-3.5 bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-gray-900 appearance-none">
+                      <option value="">-- Tidak ada penggunaan sparepart --</option>
+                      {sparepartsGudang.map((part, idx) => (
+                        <option key={idx} value={part.spesifikasi}>
+                          {part.spesifikasi} (Stok Sisa: {part.stok}) - {part.kategori}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-1 sm:col-span-1 space-y-1.5">
+                    <label className="block text-sm font-bold text-blue-900">Jml Digunakan</label>
+                    <input type="number" name="qtySparepart" min="1" value={form.qtySparepart} onChange={handleFormChange} disabled={isLoading || !form.sparepart} placeholder="Pcs" className="w-full px-3 py-3.5 text-center bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-xl font-black text-blue-700 disabled:bg-gray-100 disabled:text-gray-400" />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 bg-gray-50/80 rounded-2xl border border-gray-200/60 items-center">
@@ -327,7 +344,6 @@ export default function LogAktivitasPage() {
             </div>
 
             <div className="pt-6 border-t border-gray-200/60 flex justify-end">
-              {/* Tombol Simpan ke Draft */}
               <button type="submit" disabled={isLoading} className="group flex items-center justify-center gap-2 py-4 px-10 font-extrabold rounded-2xl text-black bg-white border-2 border-[#FFD32A] hover:bg-[#FFD32A]/10 active:scale-[0.98] transition-all duration-300 disabled:opacity-70 sm:w-auto w-full shadow-sm">
                 Simpan Data ke Draft Pengiriman
               </button>
@@ -335,12 +351,11 @@ export default function LogAktivitasPage() {
           </form>
         </div>
 
-        {/* BAGIAN KANAN: Keranjang / Draft Logs */}
         <div className="xl:col-span-2 w-full p-6 sm:p-8 bg-gray-900 border border-gray-800 rounded-3xl sm:rounded-[2rem] shadow-2xl h-[700px] flex flex-col">
           <div className="mb-6 flex justify-between items-end border-b border-gray-800 pb-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#FFD32A]">Draft Pengiriman</h2>
-              <p className="text-xs text-gray-400 mt-1">Data Anda belum terkirim ke Server.</p>
+              <p className="text-xs text-gray-400 mt-1">Data belum dikirim ke Database Satoria.</p>
             </div>
             <div className="bg-[#FFD32A] text-black w-10 h-10 rounded-full flex items-center justify-center font-black text-lg shadow-lg">
               {draftLogs.length}
@@ -367,8 +382,16 @@ export default function LogAktivitasPage() {
                     <span className="text-[10px] font-black bg-gray-900 text-gray-400 px-2 py-1 rounded">#{index + 1}</span>
                     <span className="text-[10px] font-bold text-yellow-600 bg-yellow-900/30 px-2 py-1 rounded border border-yellow-900/50">{log.mesin}</span>
                   </div>
-                  <p className="text-sm text-gray-200 font-medium line-clamp-2 leading-relaxed">{log.aktivitas}</p>
-                  <div className="mt-3 flex justify-between items-center text-[10px] text-gray-500 font-bold border-t border-gray-700/50 pt-2">
+                  <p className="text-sm text-gray-200 font-medium line-clamp-2 leading-relaxed mb-2">{log.aktivitas}</p>
+                  
+                  {/* Label Sparepart di Keranjang */}
+                  {log.sparepart && (
+                    <div className="inline-flex items-center gap-1.5 bg-blue-900/30 border border-blue-500/30 px-2 py-1 rounded text-blue-300 text-xs font-bold mb-2">
+                      <span className="text-[10px]">⚙️</span> {log.sparepart} (-{log.qtySparepart} Pcs)
+                    </div>
+                  )}
+
+                  <div className="mt-1 flex justify-between items-center text-[10px] text-gray-500 font-bold border-t border-gray-700/50 pt-2">
                     <span>{log.start} - {log.end}</span>
                     <span>Durasi: {log.durasi} Jam</span>
                   </div>
@@ -383,7 +406,7 @@ export default function LogAktivitasPage() {
               disabled={isLoading || draftLogs.length === 0} 
               className="w-full flex items-center justify-center gap-2 py-4 px-4 font-extrabold rounded-2xl text-black bg-gradient-to-r from-[#FFD32A] to-[#ffda47] hover:shadow-[0_15px_25px_-10px_rgba(255,211,42,0.3)] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:grayscale"
             >
-              {isLoading ? "Mengirim ke Server..." : `Kirim Semua Log`}
+              {isLoading ? "Mengirim Data & Memotong Stok Gudang..." : `Kirim Semua Log`}
               {!isLoading && draftLogs.length > 0 && (
                 <svg className="h-5 w-5 animate-bounce ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
               )}
@@ -391,7 +414,6 @@ export default function LogAktivitasPage() {
           </div>
         </div>
       </div>
-
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
