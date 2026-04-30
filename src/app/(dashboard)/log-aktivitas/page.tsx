@@ -20,6 +20,7 @@ interface DraftLog {
   shift: string;
   mesin: string;
   area: string;
+  jenisSparepart: string; 
   sparepart: string;
   qtySparepart: string; 
   aktivitas: string;
@@ -28,11 +29,7 @@ interface DraftLog {
   durasi: string;
 }
 
-interface SparepartGudang {
-  kategori: string;
-  spesifikasi: string;
-  stok: number;
-}
+type SparepartGrouped = Record<string, { spesifikasi: string, stok: number }[]>;
 
 export default function LogAktivitasPage() {
   const router = useRouter();
@@ -47,11 +44,11 @@ export default function LogAktivitasPage() {
     areasMap: {} as Record<string, string[]> 
   });
 
-  const [sparepartsGudang, setSparepartsGudang] = useState<SparepartGudang[]>([]);
+  const [sparepartsGudang, setSparepartsGudang] = useState<SparepartGrouped>({});
 
   const [form, setForm] = useState({
     shift: "", tanggalTugas: "",
-    mesin: "", area: "", sparepart: "", qtySparepart: "", aktivitas: "", start: "", end: ""
+    mesin: "", area: "", jenisSparepart: "", sparepart: "", qtySparepart: "", aktivitas: "", start: "", end: ""
   });
 
   const [draftLogs, setDraftLogs] = useState<DraftLog[]>([]);
@@ -79,13 +76,17 @@ export default function LogAktivitasPage() {
     .then(res => { if (res.status === "success") setValidation(res.data); })
     .catch(err => console.error("Gagal memuat data dropdown:", err));
 
-    fetch(SCRIPT_URL, {
-      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "get_sparepart_gudang" })
-    })
-    .then(res => res.json())
-    .then(res => { if (res.status === "success") setSparepartsGudang(res.data); })
-    .catch(err => console.error("Gagal memuat data Gudang:", err));
+    if (parsedData && parsedData.plant) {
+        fetch(SCRIPT_URL, {
+        method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "get_sparepart_gudang", plant: parsedData.plant })
+        })
+        .then(res => res.json())
+        .then(res => { 
+            if (res.status === "success") setSparepartsGudang(res.data); 
+        })
+        .catch(err => console.error("Gagal memuat data Gudang:", err));
+    }
 
   }, [router]);
 
@@ -110,6 +111,10 @@ export default function LogAktivitasPage() {
     setForm(prev => {
       const newForm = { ...prev, [name]: value };
       if (name === "mesin") newForm.area = ""; 
+      if (name === "jenisSparepart") {
+          newForm.sparepart = "";
+          newForm.qtySparepart = "";
+      }
       return newForm;
     });
   };
@@ -132,6 +137,7 @@ export default function LogAktivitasPage() {
       group: userData.group, 
       mesin: form.mesin,
       area: form.area,
+      jenisSparepart: form.jenisSparepart,
       sparepart: form.sparepart,
       qtySparepart: form.qtySparepart, 
       aktivitas: form.aktivitas,
@@ -143,7 +149,7 @@ export default function LogAktivitasPage() {
     setDraftLogs([...draftLogs, newLog]);
     setForm(prev => ({ 
       ...prev, 
-      mesin: "", area: "", sparepart: "", qtySparepart: "", aktivitas: "", start: "", end: "" 
+      mesin: "", area: "", jenisSparepart: "", sparepart: "", qtySparepart: "", aktivitas: "", start: "", end: "" 
     }));
   };
 
@@ -195,6 +201,12 @@ export default function LogAktivitasPage() {
   if (!userData) return null;
 
   const availableAreas = validation.areasMap[form.mesin?.toUpperCase()] || [];
+  
+  // Mencari stok maksimal dari part yang dipilih saat ini
+  const selectedPartObj = form.jenisSparepart && form.sparepart 
+    ? sparepartsGudang[form.jenisSparepart]?.find(p => p.spesifikasi === form.sparepart) 
+    : null;
+  const maxQty = selectedPartObj ? selectedPartObj.stok : "";
 
   return (
     <div className="max-w-7xl mx-auto relative px-4 sm:px-6 pb-20">
@@ -204,6 +216,7 @@ export default function LogAktivitasPage() {
         <div className="flex flex-col sm:flex-row items-center gap-5">
           <div className="w-20 h-20 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-gray-900 to-gray-700 flex items-center justify-center text-[#FFD32A] font-bold text-2xl shadow-inner overflow-hidden border-2 border-white flex-shrink-0">
             {userData.foto ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img src={getSafeImageUrl(userData.foto)} alt="User" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
               userData.nama.charAt(0).toUpperCase()
@@ -223,7 +236,7 @@ export default function LogAktivitasPage() {
           <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Status Sistem</p>
           <div className="flex items-center gap-2 bg-green-50 px-4 py-2 sm:px-3 sm:py-1.5 rounded-xl border border-green-200">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            <p className="text-sm sm:text-xs font-bold text-green-700">Terkoneksi Gudang</p>
+            <p className="text-sm sm:text-xs font-bold text-green-700">Terkoneksi Data Gudang</p>
           </div>
         </div>
       </div>
@@ -301,25 +314,37 @@ export default function LogAktivitasPage() {
                   <textarea name="aktivitas" value={form.aktivitas} onChange={handleFormChange} disabled={isLoading} rows={2} placeholder="Jelaskan perbaikan / aktivitas yang dilakukan..." className="w-full px-5 py-4 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 text-gray-900 resize-none" required />
                 </div>
 
-                {/* MODIFIKASI: Input Sparepart menjadi Dropdown Live Data + Qty */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-5 bg-blue-50/50 rounded-2xl border border-blue-200/60 items-end">
-                  <div className="col-span-1 sm:col-span-3 space-y-1.5 relative">
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 p-5 bg-blue-50/50 rounded-2xl border border-blue-200/60 items-end">
+                  <div className="col-span-1 sm:col-span-2 space-y-1.5">
                     <label className="flex justify-between items-center text-sm font-bold text-blue-900">
-                      <span>Pilih Sparepart Gudang (Opsional)</span>
-                      <span className="text-[10px] bg-blue-100 px-2 py-0.5 rounded text-blue-700">Live Gudang Sparepart</span>
+                      <span>Jenis Sparepart</span>
                     </label>
-                    <select name="sparepart" value={form.sparepart} onChange={handleFormChange} disabled={isLoading} className="w-full px-4 py-3.5 bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-gray-900 appearance-none">
-                      <option value="">-- Tidak ada penggunaan sparepart --</option>
-                      {sparepartsGudang.map((part, idx) => (
-                        <option key={idx} value={part.spesifikasi}>
-                          {part.spesifikasi} (Stok Sisa: {part.stok}) - {part.kategori}
+                    <select name="jenisSparepart" value={form.jenisSparepart} onChange={handleFormChange} disabled={isLoading || Object.keys(sparepartsGudang).length === 0} className="w-full px-4 py-3.5 bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-gray-900 appearance-none disabled:bg-gray-100 disabled:cursor-not-allowed">
+                      <option value="">-- Tidak Pakai --</option>
+                      {Object.keys(sparepartsGudang).map(jenis => (
+                        <option key={jenis} value={jenis}>{jenis}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="col-span-1 sm:col-span-2 space-y-1.5">
+                    <label className="flex justify-between items-center text-sm font-bold text-blue-900">
+                      <span>Spesifikasi Part</span>
+                    </label>
+                    <select name="sparepart" value={form.sparepart} onChange={handleFormChange} disabled={isLoading || !form.jenisSparepart} className="w-full px-4 py-3.5 bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-gray-900 appearance-none disabled:bg-gray-100 disabled:cursor-not-allowed">
+                      <option value="">-- Pilih Part --</option>
+                      {form.jenisSparepart && sparepartsGudang[form.jenisSparepart]?.map((part, idx) => (
+                        <option key={idx} value={part.spesifikasi} disabled={part.stok <= 0}>
+                          {part.spesifikasi} {part.stok > 0 ? `(Stok Sisa: ${part.stok})` : `(Stok KOSONG)`}
                         </option>
                       ))}
                     </select>
                   </div>
+
                   <div className="col-span-1 sm:col-span-1 space-y-1.5">
-                    <label className="block text-sm font-bold text-blue-900">Jml Digunakan</label>
-                    <input type="number" name="qtySparepart" min="1" value={form.qtySparepart} onChange={handleFormChange} disabled={isLoading || !form.sparepart} placeholder="Pcs" className="w-full px-3 py-3.5 text-center bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-xl font-black text-blue-700 disabled:bg-gray-100 disabled:text-gray-400" />
+                    <label className="block text-sm font-bold text-blue-900">Jumlah</label>
+                    {/* Batasan Max diatur sesuai stok riil */}
+                    <input type="number" name="qtySparepart" min="1" max={maxQty} value={form.qtySparepart} onChange={handleFormChange} disabled={isLoading || !form.sparepart} placeholder="Pcs" className="w-full px-3 py-3.5 text-center bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-xl font-black text-blue-700 disabled:bg-gray-100 disabled:text-gray-400" />
                   </div>
                 </div>
 
@@ -384,10 +409,9 @@ export default function LogAktivitasPage() {
                   </div>
                   <p className="text-sm text-gray-200 font-medium line-clamp-2 leading-relaxed mb-2">{log.aktivitas}</p>
                   
-                  {/* Label Sparepart di Keranjang */}
                   {log.sparepart && (
                     <div className="inline-flex items-center gap-1.5 bg-blue-900/30 border border-blue-500/30 px-2 py-1 rounded text-blue-300 text-xs font-bold mb-2">
-                      <span className="text-[10px]">⚙️</span> {log.sparepart} (-{log.qtySparepart} Pcs)
+                      <span className="text-[10px]">⚙️</span> {log.jenisSparepart}: {log.sparepart} (-{log.qtySparepart} Pcs)
                     </div>
                   )}
 
@@ -406,7 +430,7 @@ export default function LogAktivitasPage() {
               disabled={isLoading || draftLogs.length === 0} 
               className="w-full flex items-center justify-center gap-2 py-4 px-4 font-extrabold rounded-2xl text-black bg-gradient-to-r from-[#FFD32A] to-[#ffda47] hover:shadow-[0_15px_25px_-10px_rgba(255,211,42,0.3)] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:grayscale"
             >
-              {isLoading ? "Mengirim Data & Memotong Stok Gudang..." : `Kirim Semua Log`}
+              {isLoading ? "Mengirim Data & Memotong Stok..." : `Kirim Semua Log`}
               {!isLoading && draftLogs.length > 0 && (
                 <svg className="h-5 w-5 animate-bounce ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
               )}
