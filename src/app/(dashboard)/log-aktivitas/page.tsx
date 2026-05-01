@@ -12,6 +12,12 @@ interface UserData {
   foto?: string;
 }
 
+interface UsedPart {
+  jenisSparepart: string;
+  sparepart: string;
+  qtySparepart: string;
+}
+
 interface DraftLog {
   id: number;
   tanggalTugas: string;
@@ -20,9 +26,7 @@ interface DraftLog {
   shift: string;
   mesin: string;
   area: string;
-  jenisSparepart: string; 
-  sparepart: string;
-  qtySparepart: string; 
+  usedParts: UsedPart[]; 
   aktivitas: string;
   start: string;
   end: string;
@@ -48,8 +52,15 @@ export default function LogAktivitasPage() {
 
   const [form, setForm] = useState({
     shift: "", tanggalTugas: "",
-    mesin: "", area: "", jenisSparepart: "", sparepart: "", qtySparepart: "", aktivitas: "", start: "", end: ""
+    mesin: "", area: "", aktivitas: "", start: "", end: ""
   });
+
+  // State terpisah khusus untuk input keranjang part sementara
+  const [tempPart, setTempPart] = useState({
+    jenisSparepart: "", sparepart: "", qtySparepart: ""
+  });
+
+  const [usedPartsArray, setUsedPartsArray] = useState<UsedPart[]>([]);
 
   const [draftLogs, setDraftLogs] = useState<DraftLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -111,22 +122,59 @@ export default function LogAktivitasPage() {
     setForm(prev => {
       const newForm = { ...prev, [name]: value };
       if (name === "mesin") newForm.area = ""; 
-      if (name === "jenisSparepart") {
-          newForm.sparepart = "";
-          newForm.qtySparepart = "";
-      }
       return newForm;
     });
+  };
+
+  const handleTempPartChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setTempPart(prev => {
+      const newTemp = { ...prev, [name]: value };
+      if (name === "jenisSparepart") {
+          newTemp.sparepart = "";
+          newTemp.qtySparepart = "";
+      }
+      return newTemp;
+    });
+  };
+
+  const addPartToList = () => {
+    if (!tempPart.jenisSparepart || !tempPart.sparepart || !tempPart.qtySparepart) {
+        alert("Harap lengkapi Jenis, Spesifikasi, dan Jumlah Part!");
+        return;
+    }
+    
+    const qty = parseInt(tempPart.qtySparepart);
+    if (isNaN(qty) || qty <= 0) {
+        alert("Jumlah harus lebih dari 0!");
+        return;
+    }
+
+    const selectedPartObj = sparepartsGudang[tempPart.jenisSparepart]?.find(p => p.spesifikasi === tempPart.sparepart);
+    const maxQty = selectedPartObj ? selectedPartObj.stok : 0;
+    
+    if (qty > maxQty) {
+        alert(`Gagal: Jumlah melebihi stok yang tersedia (${maxQty} Pcs)!`);
+        return;
+    }
+
+    const isExist = usedPartsArray.find(p => p.sparepart === tempPart.sparepart);
+    if (isExist) {
+        alert("Part ini sudah ada di dalam daftar! Hapus terlebih dahulu jika ingin mengubah jumlahnya.");
+        return;
+    }
+
+    setUsedPartsArray([...usedPartsArray, { ...tempPart }]);
+    setTempPart({ jenisSparepart: "", sparepart: "", qtySparepart: "" });
+  };
+
+  const removePartFromList = (spek: string) => {
+    setUsedPartsArray(usedPartsArray.filter(p => p.sparepart !== spek));
   };
 
   const handleAddToDraft = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userData) return;
-    
-    if (form.sparepart && (!form.qtySparepart || parseInt(form.qtySparepart) <= 0)) {
-        alert("Harap masukkan Jumlah Qty sparepart yang valid!");
-        return;
-    }
 
     const durasi = calculateDurasi();
     const newLog: DraftLog = {
@@ -137,9 +185,7 @@ export default function LogAktivitasPage() {
       group: userData.group, 
       mesin: form.mesin,
       area: form.area,
-      jenisSparepart: form.jenisSparepart,
-      sparepart: form.sparepart,
-      qtySparepart: form.qtySparepart, 
+      usedParts: [...usedPartsArray], // Memasukkan semua part yang ada di keranjang
       aktivitas: form.aktivitas,
       start: form.start,
       end: form.end,
@@ -147,10 +193,13 @@ export default function LogAktivitasPage() {
     };
 
     setDraftLogs([...draftLogs, newLog]);
+    
+    // Reset Form & Keranjang Part
     setForm(prev => ({ 
-      ...prev, 
-      mesin: "", area: "", jenisSparepart: "", sparepart: "", qtySparepart: "", aktivitas: "", start: "", end: "" 
+      ...prev, mesin: "", area: "", aktivitas: "", start: "", end: "" 
     }));
+    setUsedPartsArray([]);
+    setTempPart({ jenisSparepart: "", sparepart: "", qtySparepart: "" });
   };
 
   const handleRemoveDraft = (id: number) => {
@@ -202,9 +251,8 @@ export default function LogAktivitasPage() {
 
   const availableAreas = validation.areasMap[form.mesin?.toUpperCase()] || [];
   
-  // Mencari stok maksimal dari part yang dipilih saat ini
-  const selectedPartObj = form.jenisSparepart && form.sparepart 
-    ? sparepartsGudang[form.jenisSparepart]?.find(p => p.spesifikasi === form.sparepart) 
+  const selectedPartObj = tempPart.jenisSparepart && tempPart.sparepart 
+    ? sparepartsGudang[tempPart.jenisSparepart]?.find(p => p.spesifikasi === tempPart.sparepart) 
     : null;
   const maxQty = selectedPartObj ? selectedPartObj.stok : "";
 
@@ -314,38 +362,58 @@ export default function LogAktivitasPage() {
                   <textarea name="aktivitas" value={form.aktivitas} onChange={handleFormChange} disabled={isLoading} rows={2} placeholder="Jelaskan perbaikan / aktivitas yang dilakukan..." className="w-full px-5 py-4 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 text-gray-900 resize-none" required />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 p-5 bg-blue-50/50 rounded-2xl border border-blue-200/60 items-end">
-                  <div className="col-span-1 sm:col-span-2 space-y-1.5">
-                    <label className="flex justify-between items-center text-sm font-bold text-blue-900">
-                      <span>Jenis Sparepart</span>
-                    </label>
-                    <select name="jenisSparepart" value={form.jenisSparepart} onChange={handleFormChange} disabled={isLoading || Object.keys(sparepartsGudang).length === 0} className="w-full px-4 py-3.5 bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-gray-900 appearance-none disabled:bg-gray-100 disabled:cursor-not-allowed">
-                      <option value="">-- Tidak Pakai --</option>
-                      {Object.keys(sparepartsGudang).map(jenis => (
-                        <option key={jenis} value={jenis}>{jenis}</option>
-                      ))}
-                    </select>
+                {/* MODIFIKASI MULTIPLE PART: UI Mini Cart */}
+                <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-200/60 flex flex-col gap-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-blue-900">Tambahkan Sparepart (Jika Ada)</span>
+                    <span className="text-[10px] bg-blue-100 px-2 py-0.5 rounded text-blue-700 font-bold uppercase tracking-wider">Live Gudang</span>
                   </div>
                   
-                  <div className="col-span-1 sm:col-span-2 space-y-1.5">
-                    <label className="flex justify-between items-center text-sm font-bold text-blue-900">
-                      <span>Spesifikasi Part</span>
-                    </label>
-                    <select name="sparepart" value={form.sparepart} onChange={handleFormChange} disabled={isLoading || !form.jenisSparepart} className="w-full px-4 py-3.5 bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-gray-900 appearance-none disabled:bg-gray-100 disabled:cursor-not-allowed">
-                      <option value="">-- Pilih Part --</option>
-                      {form.jenisSparepart && sparepartsGudang[form.jenisSparepart]?.map((part, idx) => (
-                        <option key={idx} value={part.spesifikasi} disabled={part.stok <= 0}>
-                          {part.spesifikasi} {part.stok > 0 ? `(Stok Sisa: ${part.stok})` : `(Stok KOSONG)`}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    <div className="col-span-1 sm:col-span-4">
+                      <select name="jenisSparepart" value={tempPart.jenisSparepart} onChange={handleTempPartChange} disabled={isLoading || Object.keys(sparepartsGudang).length === 0} className="w-full px-3 py-2.5 bg-white border border-blue-300/80 rounded-lg text-sm text-gray-900 appearance-none disabled:bg-gray-100">
+                        <option value="">-- Pilih Jenis --</option>
+                        {Object.keys(sparepartsGudang).map(jenis => (
+                          <option key={jenis} value={jenis}>{jenis}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-1 sm:col-span-5">
+                      <select name="sparepart" value={tempPart.sparepart} onChange={handleTempPartChange} disabled={isLoading || !tempPart.jenisSparepart} className="w-full px-3 py-2.5 bg-white border border-blue-300/80 rounded-lg text-sm text-gray-900 appearance-none disabled:bg-gray-100">
+                        <option value="">-- Pilih Spesifikasi --</option>
+                        {tempPart.jenisSparepart && sparepartsGudang[tempPart.jenisSparepart]?.map((part, idx) => (
+                          <option key={idx} value={part.spesifikasi} disabled={part.stok <= 0}>
+                            {part.spesifikasi} {part.stok > 0 ? `(Stok: ${part.stok})` : `(KOSONG)`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-1 sm:col-span-2">
+                      <input type="number" name="qtySparepart" min="1" max={maxQty} value={tempPart.qtySparepart} onChange={handleTempPartChange} disabled={isLoading || !tempPart.sparepart} placeholder="Jml" className="w-full px-3 py-2.5 bg-white border border-blue-300/80 rounded-lg text-sm text-center text-blue-700 font-bold disabled:bg-gray-100" />
+                    </div>
+                    <div className="col-span-1 sm:col-span-1">
+                      <button type="button" onClick={addPartToList} disabled={isLoading || !tempPart.sparepart || !tempPart.qtySparepart} className="w-full h-[42px] bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex justify-center items-center font-bold disabled:opacity-50 transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="col-span-1 sm:col-span-1 space-y-1.5">
-                    <label className="block text-sm font-bold text-blue-900">Jumlah</label>
-                    {/* Batasan Max diatur sesuai stok riil */}
-                    <input type="number" name="qtySparepart" min="1" max={maxQty} value={form.qtySparepart} onChange={handleFormChange} disabled={isLoading || !form.sparepart} placeholder="Pcs" className="w-full px-3 py-3.5 text-center bg-white border border-blue-300/80 rounded-xl focus:ring-4 focus:ring-blue-300/40 text-xl font-black text-blue-700 disabled:bg-gray-100 disabled:text-gray-400" />
-                  </div>
+                  {/* Daftar Part yang sudah ditambahkan */}
+                  {usedPartsArray.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-blue-200/50">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Part yang akan digunakan:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {usedPartsArray.map((p, idx) => (
+                          <div key={idx} className="inline-flex items-center gap-2 bg-white border border-blue-300/80 pl-3 pr-1 py-1 rounded-full shadow-sm text-xs font-bold text-slate-700">
+                            <span>{p.sparepart} <span className="text-blue-600">({p.qtySparepart} Pcs)</span></span>
+                            <button type="button" onClick={() => removePartFromList(p.sparepart)} className="w-5 h-5 bg-red-100 hover:bg-red-500 text-red-500 hover:text-white rounded-full flex justify-center items-center transition-colors">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 bg-gray-50/80 rounded-2xl border border-gray-200/60 items-center">
@@ -407,11 +475,16 @@ export default function LogAktivitasPage() {
                     <span className="text-[10px] font-black bg-gray-900 text-gray-400 px-2 py-1 rounded">#{index + 1}</span>
                     <span className="text-[10px] font-bold text-yellow-600 bg-yellow-900/30 px-2 py-1 rounded border border-yellow-900/50">{log.mesin}</span>
                   </div>
-                  <p className="text-sm text-gray-200 font-medium line-clamp-2 leading-relaxed mb-2">{log.aktivitas}</p>
+                  <p className="text-sm text-gray-200 font-medium line-clamp-2 leading-relaxed mb-3">{log.aktivitas}</p>
                   
-                  {log.sparepart && (
-                    <div className="inline-flex items-center gap-1.5 bg-blue-900/30 border border-blue-500/30 px-2 py-1 rounded text-blue-300 text-xs font-bold mb-2">
-                      <span className="text-[10px]">⚙️</span> {log.jenisSparepart}: {log.sparepart} (-{log.qtySparepart} Pcs)
+                  {/* Render Array Part di Draft */}
+                  {log.usedParts && log.usedParts.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-1">
+                      {log.usedParts.map((p, pIdx) => (
+                         <span key={pIdx} className="inline-flex items-center gap-1 bg-blue-900/40 border border-blue-500/30 px-2 py-1 rounded text-blue-300 text-[10px] font-bold">
+                           ⚙️ {p.sparepart} (-{p.qtySparepart})
+                         </span>
+                      ))}
                     </div>
                   )}
 
