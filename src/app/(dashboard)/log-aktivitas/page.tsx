@@ -18,6 +18,11 @@ interface UsedPart {
   qtySparepart: string;
 }
 
+interface UsedNonGudangPart {
+  namaPart: string;
+  qtyPart: string;
+}
+
 interface DraftLog {
   id: number;
   tanggalTugas: string;
@@ -27,6 +32,7 @@ interface DraftLog {
   mesin: string;
   area: string;
   usedParts: UsedPart[]; 
+  usedNonGudangParts: UsedNonGudangPart[]; 
   aktivitas: string;
   start: string;
   end: string;
@@ -55,12 +61,17 @@ export default function LogAktivitasPage() {
     mesin: "", area: "", aktivitas: "", start: "", end: ""
   });
 
-  // State terpisah khusus untuk input keranjang part sementara
+  // State terpisah khusus untuk input keranjang part Gudang
   const [tempPart, setTempPart] = useState({
     jenisSparepart: "", sparepart: "", qtySparepart: ""
   });
-
   const [usedPartsArray, setUsedPartsArray] = useState<UsedPart[]>([]);
+
+  // State terpisah khusus untuk input keranjang part NON-Gudang
+  const [tempNonGudangPart, setTempNonGudangPart] = useState({
+    namaPart: "", qtyPart: ""
+  });
+  const [usedNonGudangPartsArray, setUsedNonGudangPartsArray] = useState<UsedNonGudangPart[]>([]);
 
   const [draftLogs, setDraftLogs] = useState<DraftLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -126,6 +137,7 @@ export default function LogAktivitasPage() {
     });
   };
 
+  // --- Handlers for Part Gudang ---
   const handleTempPartChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setTempPart(prev => {
@@ -143,7 +155,6 @@ export default function LogAktivitasPage() {
         alert("Harap lengkapi Jenis, Spesifikasi, dan Jumlah Part!");
         return;
     }
-    
     const qty = parseInt(tempPart.qtySparepart);
     if (isNaN(qty) || qty <= 0) {
         alert("Jumlah harus lebih dari 0!");
@@ -172,6 +183,38 @@ export default function LogAktivitasPage() {
     setUsedPartsArray(usedPartsArray.filter(p => p.sparepart !== spek));
   };
 
+  // --- Handlers for Part NON-Gudang ---
+  const handleTempNonGudangPartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setTempNonGudangPart(prev => ({ ...prev, [name]: value }));
+  };
+
+  const addNonGudangPartToList = () => {
+    if (!tempNonGudangPart.namaPart || !tempNonGudangPart.qtyPart) {
+        alert("Harap lengkapi Nama Part dan Jumlahnya!");
+        return;
+    }
+    const qty = parseInt(tempNonGudangPart.qtyPart);
+    if (isNaN(qty) || qty <= 0) {
+        alert("Jumlah harus lebih dari 0!");
+        return;
+    }
+
+    const isExist = usedNonGudangPartsArray.find(p => p.namaPart.toLowerCase() === tempNonGudangPart.namaPart.toLowerCase());
+    if (isExist) {
+        alert("Part ini sudah ada di dalam daftar! Hapus terlebih dahulu jika ingin mengubah jumlahnya.");
+        return;
+    }
+
+    setUsedNonGudangPartsArray([...usedNonGudangPartsArray, { ...tempNonGudangPart }]);
+    setTempNonGudangPart({ namaPart: "", qtyPart: "" });
+  };
+
+  const removeNonGudangPartFromList = (namaPart: string) => {
+    setUsedNonGudangPartsArray(usedNonGudangPartsArray.filter(p => p.namaPart !== namaPart));
+  };
+
+  // --- Draft Logic ---
   const handleAddToDraft = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userData) return;
@@ -185,7 +228,8 @@ export default function LogAktivitasPage() {
       group: userData.group, 
       mesin: form.mesin,
       area: form.area,
-      usedParts: [...usedPartsArray], // Memasukkan semua part yang ada di keranjang
+      usedParts: [...usedPartsArray],
+      usedNonGudangParts: [...usedNonGudangPartsArray], 
       aktivitas: form.aktivitas,
       start: form.start,
       end: form.end,
@@ -194,12 +238,13 @@ export default function LogAktivitasPage() {
 
     setDraftLogs([...draftLogs, newLog]);
     
-    // Reset Form & Keranjang Part
     setForm(prev => ({ 
       ...prev, mesin: "", area: "", aktivitas: "", start: "", end: "" 
     }));
     setUsedPartsArray([]);
+    setUsedNonGudangPartsArray([]);
     setTempPart({ jenisSparepart: "", sparepart: "", qtySparepart: "" });
+    setTempNonGudangPart({ namaPart: "", qtyPart: "" });
   };
 
   const handleRemoveDraft = (id: number) => {
@@ -362,10 +407,10 @@ export default function LogAktivitasPage() {
                   <textarea name="aktivitas" value={form.aktivitas} onChange={handleFormChange} disabled={isLoading} rows={2} placeholder="Jelaskan perbaikan / aktivitas yang dilakukan..." className="w-full px-5 py-4 bg-white border border-gray-200/80 rounded-xl focus:ring-4 focus:ring-[#FFD32A]/30 text-gray-900 resize-none" required />
                 </div>
 
-                {/* MODIFIKASI MULTIPLE PART: UI Mini Cart */}
+                {/* FORM PART 1: GUDANG */}
                 <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-200/60 flex flex-col gap-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-bold text-blue-900">Tambahkan Sparepart (Jika Ada)</span>
+                    <span className="text-sm font-bold text-blue-900">Tambahkan Part Gudang</span>
                     <span className="text-[10px] bg-blue-100 px-2 py-0.5 rounded text-blue-700 font-bold uppercase tracking-wider">Live Gudang</span>
                   </div>
                   
@@ -398,15 +443,50 @@ export default function LogAktivitasPage() {
                     </div>
                   </div>
 
-                  {/* Daftar Part yang sudah ditambahkan */}
                   {usedPartsArray.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-blue-200/50">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Part yang akan digunakan:</p>
                       <div className="flex flex-wrap gap-2">
                         {usedPartsArray.map((p, idx) => (
                           <div key={idx} className="inline-flex items-center gap-2 bg-white border border-blue-300/80 pl-3 pr-1 py-1 rounded-full shadow-sm text-xs font-bold text-slate-700">
                             <span>{p.sparepart} <span className="text-blue-600">({p.qtySparepart} Pcs)</span></span>
                             <button type="button" onClick={() => removePartFromList(p.sparepart)} className="w-5 h-5 bg-red-100 hover:bg-red-500 text-red-500 hover:text-white rounded-full flex justify-center items-center transition-colors">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* FORM PART 2: NON-GUDANG (MANUAL) */}
+                <div className="p-5 bg-orange-50/50 rounded-2xl border border-orange-200/60 flex flex-col gap-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-orange-900">Tambahkan Part Non-Gudang (Lain-lain)</span>
+                    <span className="text-[10px] bg-orange-100 px-2 py-0.5 rounded text-orange-700 font-bold uppercase tracking-wider">Manual Input</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    <div className="col-span-1 sm:col-span-9">
+                      <input type="text" name="namaPart" value={tempNonGudangPart.namaPart} onChange={handleTempNonGudangPartChange} disabled={isLoading} placeholder="Tuliskan nama barang/material..." className="w-full px-3 py-2.5 bg-white border border-orange-300/80 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-orange-400 outline-none disabled:bg-gray-100" />
+                    </div>
+                    <div className="col-span-1 sm:col-span-2">
+                      <input type="number" name="qtyPart" min="1" value={tempNonGudangPart.qtyPart} onChange={handleTempNonGudangPartChange} disabled={isLoading} placeholder="Jml" className="w-full px-3 py-2.5 bg-white border border-orange-300/80 rounded-lg text-sm text-center text-orange-700 font-bold focus:ring-2 focus:ring-orange-400 outline-none disabled:bg-gray-100" />
+                    </div>
+                    <div className="col-span-1 sm:col-span-1">
+                      <button type="button" onClick={addNonGudangPartToList} disabled={isLoading || !tempNonGudangPart.namaPart || !tempNonGudangPart.qtyPart} className="w-full h-[42px] bg-orange-500 hover:bg-orange-600 text-white rounded-lg flex justify-center items-center font-bold disabled:opacity-50 transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {usedNonGudangPartsArray.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-orange-200/50">
+                      <div className="flex flex-wrap gap-2">
+                        {usedNonGudangPartsArray.map((p, idx) => (
+                          <div key={idx} className="inline-flex items-center gap-2 bg-white border border-orange-300/80 pl-3 pr-1 py-1 rounded-full shadow-sm text-xs font-bold text-slate-700">
+                            <span>{p.namaPart} <span className="text-orange-600">({p.qtyPart} Pcs)</span></span>
+                            <button type="button" onClick={() => removeNonGudangPartFromList(p.namaPart)} className="w-5 h-5 bg-red-100 hover:bg-red-500 text-red-500 hover:text-white rounded-full flex justify-center items-center transition-colors">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                           </div>
@@ -426,7 +506,7 @@ export default function LogAktivitasPage() {
                     <input type="time" name="end" value={form.end} onChange={handleFormChange} required className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#FFD32A] text-gray-900 font-bold" />
                   </div>
                   <div className="col-span-2 sm:col-span-2 text-center sm:text-right pt-2 sm:pt-0">
-                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Durasi</p>
+                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Durasi Total</p>
                     <p className="text-xl font-extrabold text-black">
                       {calculateDurasi() || "0.00"}
                     </p>
@@ -477,16 +557,30 @@ export default function LogAktivitasPage() {
                   </div>
                   <p className="text-sm text-gray-200 font-medium line-clamp-2 leading-relaxed mb-3">{log.aktivitas}</p>
                   
-                  {/* Render Array Part di Draft */}
-                  {log.usedParts && log.usedParts.length > 0 && (
-                    <div className="mb-3 flex flex-wrap gap-1">
-                      {log.usedParts.map((p, pIdx) => (
-                         <span key={pIdx} className="inline-flex items-center gap-1 bg-blue-900/40 border border-blue-500/30 px-2 py-1 rounded text-blue-300 text-[10px] font-bold">
-                           ⚙️ {p.sparepart} (-{p.qtySparepart})
-                         </span>
-                      ))}
-                    </div>
-                  )}
+                  {/* Container Part Labels */}
+                  <div className="mb-3 flex flex-col gap-1.5">
+                    {/* Render Part Gudang */}
+                    {log.usedParts && log.usedParts.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {log.usedParts.map((p, pIdx) => (
+                          <span key={`gudang-${pIdx}`} className="inline-flex items-center gap-1 bg-blue-900/40 border border-blue-500/30 px-2 py-1 rounded text-blue-300 text-[10px] font-bold">
+                            ⚙️ {p.sparepart} (-{p.qtySparepart})
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Render Part Non-Gudang */}
+                    {log.usedNonGudangParts && log.usedNonGudangParts.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {log.usedNonGudangParts.map((p, pIdx) => (
+                          <span key={`nongudang-${pIdx}`} className="inline-flex items-center gap-1 bg-orange-900/40 border border-orange-500/30 px-2 py-1 rounded text-orange-300 text-[10px] font-bold">
+                            📦 {p.namaPart} (-{p.qtyPart})
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   <div className="mt-1 flex justify-between items-center text-[10px] text-gray-500 font-bold border-t border-gray-700/50 pt-2">
                     <span>{log.start} - {log.end}</span>
@@ -503,7 +597,7 @@ export default function LogAktivitasPage() {
               disabled={isLoading || draftLogs.length === 0} 
               className="w-full flex items-center justify-center gap-2 py-4 px-4 font-extrabold rounded-2xl text-black bg-gradient-to-r from-[#FFD32A] to-[#ffda47] hover:shadow-[0_15px_25px_-10px_rgba(255,211,42,0.3)] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:grayscale"
             >
-              {isLoading ? "Mengirim Data & Memotong Stok..." : `Kirim Semua Log`}
+              {isLoading ? "Mengirim Data..." : `Kirim Semua Log Sekarang`}
               {!isLoading && draftLogs.length > 0 && (
                 <svg className="h-5 w-5 animate-bounce ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
               )}
