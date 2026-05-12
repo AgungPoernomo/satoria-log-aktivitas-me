@@ -462,7 +462,7 @@ export default function LogAktivitasPage() {
                 {/* FORM PART 2: NON-GUDANG (MANUAL) */}
                 <div className="p-5 bg-orange-50/50 rounded-2xl border border-orange-200/60 flex flex-col gap-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-bold text-orange-900">Tambahkan Part Non-Gudang (Lain-lain)</span>
+                    <span className="text-sm font-bold text-orange-900">Part Lain Yang Tidak Ada di List</span>
                     <span className="text-[10px] bg-orange-100 px-2 py-0.5 rounded text-orange-700 font-bold uppercase tracking-wider">Manual Input</span>
                   </div>
                   
