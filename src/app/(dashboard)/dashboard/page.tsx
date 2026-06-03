@@ -50,12 +50,19 @@ export default function DashboardPage() {
     group: "", dept: "", plant: "", shift: "", mesin: ""
   });
 
+  // ==========================================
+  // STATE FILTER TANGGAL (Default: Bulan Ini)
+  // ==========================================
+  const getCurrentMonthYear = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const [filterBulan, setFilterBulan] = useState(getCurrentMonthYear());
+
   const [selectedLog, setSelectedLog] = useState<LogData | null>(null);
   const [selectedHistoryUser, setSelectedHistoryUser] = useState<{nama: string, logs: LogData[]} | null>(null);
 
-  // ==========================================
-  // STATE PAGINATION (Halaman)
-  // ==========================================
+  // STATE PAGINATION
   const [listPage, setListPage] = useState(1);
   const [tablePage, setTablePage] = useState(1);
   const LIST_LIMIT = 10;
@@ -85,8 +92,7 @@ export default function DashboardPage() {
 
         const reversedData = mappedData.reverse();
         setLogs(reversedData);
-        setFilteredLogs(reversedData); 
-        if (res.photos) setUserPhotos(res.photos);
+        // Jangan setFilteredLogs disini, biarkan useEffect di bawah yang menanganinya
       }
     })
     .catch(err => console.error("Gagal load dashboard:", err))
@@ -96,6 +102,7 @@ export default function DashboardPage() {
   useEffect(() => {
     let result = logs;
 
+    // 1. Filter Pencarian Teks
     if (searchQuery.trim()) {
       const lowerQuery = searchQuery.toLowerCase();
       result = result.filter(log => 
@@ -105,6 +112,18 @@ export default function DashboardPage() {
       );
     }
 
+    // 2. Filter Bulan & Tahun (Jika diset)
+    if (filterBulan) {
+      const [year, month] = filterBulan.split("-").map(Number);
+      result = result.filter(log => {
+        const strClean = String(log.tanggalTugas).trim();
+        const dateObj = new Date(strClean.split(" ")[0]);
+        if (isNaN(dateObj.getTime())) return false; // Abaikan jika format tanggal di database rusak
+        return dateObj.getFullYear() === year && (dateObj.getMonth() + 1) === month;
+      });
+    }
+
+    // 3. Filter Dropdown Standar
     if (filters.group) result = result.filter(l => l.group === filters.group);
     if (filters.dept) result = result.filter(l => l.dept === filters.dept);
     if (filters.plant) result = result.filter(l => l.plant === filters.plant);
@@ -113,10 +132,11 @@ export default function DashboardPage() {
 
     setFilteredLogs(result);
     
-    // Reset halaman ke 1 setiap kali filter berubah
+    // Reset halaman pagination setiap kali filter berubah
     setListPage(1);
     setTablePage(1);
 
+    // Kalkulasi Data Chart (Leaderboard)
     const userCounts: Record<string, number> = {};
     result.forEach(log => {
       if (log.nama) userCounts[log.nama] = (userCounts[log.nama] || 0) + 1;
@@ -126,23 +146,18 @@ export default function DashboardPage() {
       .sort((a, b) => b.count - a.count);
     setChartData(sortedChart);
 
-  }, [searchQuery, filters, logs]);
+  }, [searchQuery, filters, filterBulan, logs]);
 
   const handleResetFilters = () => {
     setFilters({ group: "", dept: "", plant: "", shift: "", mesin: "" });
     setSearchQuery("");
+    setFilterBulan(getCurrentMonthYear()); // Kembalikan ke bulan ini
   };
 
-  // ==========================================
-  // FITUR EXPORT (DOWNLOAD ALL FILTERED DATA)
-  // ==========================================
   const exportToExcel = () => {
     if (filteredLogs.length === 0) return alert("Tidak ada data untuk didownload.");
-    
-    // Header CSV
     const headers = ["Waktu Kirim", "Plant", "Departement", "Nama Karyawan", "Tanggal Buka", "Shift", "Group", "Tanggal Tugas", "Mesin", "Area", "Sparepart", "Aktivitas", "Start", "End", "Durasi (Jam)"];
     
-    // Konversi objek ke array of string untuk CSV (Mencegah error koma di dalam teks aktivitas)
     const csvContent = [
       headers.join(","),
       ...filteredLogs.map(log => [
@@ -153,7 +168,6 @@ export default function DashboardPage() {
       ].join(","))
     ].join("\n");
 
-    // Gunakan BOM (\uFEFF) agar MS Excel membaca karakter UTF-8 dengan benar
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -166,7 +180,6 @@ export default function DashboardPage() {
 
   const exportToPDF = () => {
     if (filteredLogs.length === 0) return alert("Tidak ada data untuk didownload.");
-    
     const printWindow = window.open('', '_blank');
     if (!printWindow) return alert("Pop-up diblokir oleh browser. Harap izinkan pop-up untuk mendownload PDF.");
     
@@ -216,21 +229,16 @@ export default function DashboardPage() {
           <script>
             window.onload = () => { 
               window.print(); 
-              // Menutup otomatis setelah dialog print muncul
               setTimeout(() => { window.close(); }, 500); 
             }
           </script>
         </body>
       </html>
     `;
-    
     printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
 
-  // ==========================================
-  // HELPER FUNCTIONS 
-  // ==========================================
   const formatTgl = (tgl: string) => {
     if (!tgl) return "-";
     const strClean = String(tgl).trim();
@@ -271,7 +279,6 @@ export default function DashboardPage() {
 
   const maxChartCount = chartData.length > 0 ? chartData[0].count : 1;
 
-  // KALKULASI DATA PAGINATION
   const totalListPages = Math.ceil(filteredLogs.length / LIST_LIMIT) || 1;
   const currentListData = filteredLogs.slice((listPage - 1) * LIST_LIMIT, listPage * LIST_LIMIT);
 
@@ -307,13 +314,24 @@ export default function DashboardPage() {
       <div className="mb-8 p-6 bg-white/60 backdrop-blur-xl border border-white/80 rounded-[2rem] shadow-[0_15px_35px_-15px_rgba(0,0,0,0.05)] relative z-10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
           <h2 className="text-sm font-extrabold text-gray-400 uppercase tracking-wider">Dashboard Filters</h2>
-          {(filters.group || filters.dept || filters.plant || filters.shift || filters.mesin || searchQuery) && (
+          {(filters.group || filters.dept || filters.plant || filters.shift || filters.mesin || searchQuery || filterBulan !== getCurrentMonthYear()) && (
             <button onClick={handleResetFilters} className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">
               ✖ Reset Semua Filter
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* FILTER BULAN TAHUN */}
+          <div className="flex flex-col">
+            <label className="text-[10px] font-bold text-gray-400 mb-1 ml-1">Bulan & Tahun</label>
+            <input 
+              type="month" 
+              value={filterBulan} 
+              onChange={(e) => setFilterBulan(e.target.value)}
+              className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-[#FFD32A] outline-none font-medium hover:border-gray-300 transition-colors"
+            />
+          </div>
+
           <FilterSelect label="Plant" value={filters.plant} options={uniquePlant} onChange={(val) => setFilters({...filters, plant: val})} />
           <FilterSelect label="Departement" value={filters.dept} options={uniqueDept} onChange={(val) => setFilters({...filters, dept: val})} />
           <FilterSelect label="Group" value={filters.group} options={uniqueGroup} onChange={(val) => setFilters({...filters, group: val})} />
@@ -434,7 +452,6 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-500">Menampilkan {filteredLogs.length} hasil berdasarkan filter.</p>
           </div>
           
-          {/* TOMBOL EXPORT */}
           <div className="flex gap-2 w-full sm:w-auto">
             <button onClick={exportToExcel} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-green-50 text-green-700 border border-green-200 px-4 py-2.5 rounded-xl text-xs font-extrabold hover:bg-green-100 transition-colors shadow-sm">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -610,7 +627,7 @@ function FilterSelect({ label, value, options, onChange }: { label: string, valu
   return (
     <div className="flex flex-col">
       <label className="text-[10px] font-bold text-gray-400 mb-1 ml-1">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-[#FFD32A] outline-none font-medium appearance-none cursor-pointer hover:border-gray-300">
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-[#FFD32A] outline-none font-medium appearance-none cursor-pointer hover:border-gray-300 transition-colors">
         <option value="">Semua</option>
         {options.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
       </select>
